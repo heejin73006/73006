@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>서울·경기 프로젝트 현황 - 컬러 매칭 버전</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --border: #E0E0E0; }
+        body { font-family: 'Noto Sans KR', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: #333; }
+        
+        header { padding: 10px 20px; border-bottom: 1px solid var(--border); background: white; z-index: 1000; display: flex; justify-content: space-between; align-items: center; height: 50px; }
+        h1 { margin: 0; font-size: 16px; font-weight: 700; }
+
+        .switch-container { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #0055A4; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .layout { display: flex; flex: 1; overflow: hidden; }
+        #map { flex: 1; height: 100%; z-index: 1; }
+        
+        .sidebar { width: 320px; display: flex; flex-direction: column; background: #ffffff; border-left: 1px solid var(--border); z-index: 2; }
+        .sidebar-content { padding: 15px; overflow-y: auto; flex: 1; }
+        body.full-map-mode .sidebar { display: none; }
+
+        /* 드래그 가능한 라벨 (테두리 색상은 JS에서 동적 부여) */
+        .draggable-label-container {
+            background: rgba(255, 255, 255, 0.98);
+            border-width: 2px;
+            border-style: solid;
+            border-radius: 6px;
+            padding: 8px 10px;
+            box-shadow: 4px 4px 12px rgba(0,0,0,0.1);
+            text-align: left;
+            font-size: 11px;
+            width: max-content;
+            cursor: grab;
+            user-select: none;
+        }
+        
+        .label-title { font-weight: 700; font-size: 12px; display: block; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 4px; }
+        .label-content { display: block; color: #555; margin: 1px 0; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; padding: 10px 5px; font-size: 12px; border-bottom: 2px solid var(--border); text-align: left; }
+        td { padding: 10px 5px; border-bottom: 1px solid var(--border); font-size: 12px; }
+        .status-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>서울·경기 프로젝트 현황 (컬러 세분화)</h1>
+    <div class="switch-container">
+        라벨 편집 모드
+        <label class="switch">
+            <input type="checkbox" id="mode-toggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+</header>
+
+<div class="layout">
+    <div id="map"></div>
+    <div class="sidebar">
+        <div class="sidebar-content">
+            <h3 style="font-size: 14px;">📋 프로젝트 현황 목록</h3>
+            <table>
+                <thead><tr><th width="30">No</th><th>정보 / 단계</th></tr></thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // 프로젝트 단계별 컬러 매핑 함수
+    function getStepColor(stage) {
+        if (stage.includes("협약") || stage.includes("발주")) return "#E53935"; // Red
+        if (stage.includes("설계")) return "#1E88E5"; // Blue
+        if (stage.includes("컨설팅")) return "#43A047"; // Green
+        if (stage.includes("검토")) return "#8E24AA"; // Purple
+        return "#757575"; // Gray (Default)
+    }
+
+    const projects = [
+        { id: 1, name: "서울대 68-1관", loc: "관악구", client: "서울대", vol: "33", stage: "기본설계", lat: 37.4533582, lng: 126.9571625 },
+        { id: 2, name: "성남 정수장", loc: "성남시", client: "수자원공사", vol: "74(91)", stage: "협약준비", lat: 37.4127307, lng: 127.1087071 },
+        { id: 3, name: "광명학온 공원동", loc: "광명시", client: "경기도시공사", vol: "58", stage: "발주대기", lat: 37.4101401, lng: 126.8635773 },
+        { id: 4, name: "태평로빌딩 FIT", loc: "중구", client: "이지스자산", vol: "3,097", stage: "실시설계", lat: 37.5630066, lng: 126.9757363 },
+        { id: 5, name: "서울역 업무지구", loc: "용산구", client: "삼성물산", vol: "276", stage: "컨설팅", lat: 37.5563060, lng: 126.9744798 },
+        { id: 6, name: "동서울터미널 FIT", loc: "광진구", client: "신세계", vol: "506", stage: "컨설팅", lat: 37.5356993, lng: 127.0957650 },
+        { id: 7, name: "ASML 원삼 Office", loc: "용인시", client: "ASML", vol: "1,100", stage: "발주대기", lat: 37.1543160, lng: 127.3182542 },
+        { id: 8, name: "크래프톤 C3 신축", loc: "성동구", client: "크래프톤", vol: "252", stage: "사전컨설팅", lat: 37.5408084, lng: 127.0574413 },
+        { id: 9, name: "애플타워", loc: "송파구", client: "애플A&M", vol: "검토중", stage: "검토중", lat: 37.5105279, lng: 127.0790511 },
+        { id: 10, name: "강남 358타워", loc: "강남구", client: "HDC자산", vol: "1,629", stage: "사전컨설팅", lat: 37.4950386, lng: 127.0297037 },
+        { id: 11, name: "논현동 개발 검토", loc: "강남구", client: "신세계", vol: "1,926", stage: "사전컨설팅", lat: 37.5111837, lng: 127.0225186 },
+        { id: 12, name: "삼성동 168 오피스", loc: "강남구", client: "두나무", vol: "500", stage: "사전컨설팅", lat: 37.5103722, lng: 127.0629707 },
+        { id: 13, name: "관수8지구 재개발", loc: "종로구", client: "NH증권", vol: "1,290", stage: "사전컨설팅", lat: 37.5685801, lng: 126.9900656 },
+        { id: 14, name: "역삼 SI 타워", loc: "강남구", client: "이지스자산", vol: "1,960", stage: "사전컨설팅", lat: 37.5015926, lng: 127.0377365 }
+    ];
+
+    const map = L.map('map').setView([37.51, 127.05], 11);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+    const projectLayer = L.layerGroup().addTo(map);
+    const draggableGroup = L.layerGroup().addTo(map);
+    const markers = [];
+
+    const avgLat = projects.reduce((sum, p) => sum + p.lat, 0) / projects.length;
+    const avgLng = projects.reduce((sum, p) => sum + p.lng, 0) / projects.length;
+
+    projects.forEach(p => {
+        const color = getStepColor(p.stage);
+        
+        // 1. 핀 생성
+        const pin = L.circleMarker([p.lat, p.lng], {
+            radius: 6, fillColor: color, color: "#fff", weight: 2, fillOpacity: 1
+        }).addTo(projectLayer);
+
+        // 2. 사이드바 테이블
+        document.getElementById('table-body').innerHTML += `
+            <tr>
+                <td>${p.id}</td>
+                <td>
+                    <b>${p.name}</b><br>
+                    <span class="status-badge" style="background:${color}">${p.stage}</span>
+                </td>
+            </tr>
+        `;
+
+        // 3. 드래그 라벨 (테두리 색상 color 변수 적용)
+        const latDiff = p.lat - avgLat;
+        const lngDiff = p.lng - avgLng;
+        const initialLabelPos = [p.lat + (latDiff * 2.5), p.lng + (lngDiff * 3.5)];
+
+        const labelHtml = `
+            <div class="draggable-label-container" style="border-color: ${color};">
+                <span class="label-title" style="color: ${color};">${p.id}. ${p.name}</span>
+                <span class="label-content">📍 ${p.loc} | 🏢 ${p.client}</span>
+                <span class="label-content">📦 <b>${p.vol}</b> | ⚙️ <b>${p.stage}</b></span>
+            </div>
+        `;
+
+        const labelIcon = L.divIcon({ html: labelHtml, className: '', iconAnchor: [0, 0] });
+        const labelMarker = L.marker(initialLabelPos, { icon: labelIcon, draggable: true });
+        const polyline = L.polyline([[p.lat, p.lng], initialLabelPos], { color: color, weight: 1.5, dashArray: '4, 4', opacity: 0.7 });
+
+        labelMarker.on('drag', (e) => polyline.setLatLngs([[p.lat, p.lng], e.target.getLatLng()]));
+
+        markers.push({ pin, labelMarker, polyline, data: p, color: color });
+    });
+
+    function updateMode() {
+        const isEdit = document.getElementById('mode-toggle').checked;
+        if (isEdit) {
+            document.body.classList.add('full-map-mode');
+            markers.forEach(m => {
+                m.pin.unbindTooltip();
+                m.labelMarker.addTo(draggableGroup);
+                m.polyline.addTo(draggableGroup);
+            });
+        } else {
+            document.body.classList.remove('full-map-mode');
+            draggableGroup.clearLayers();
+            markers.forEach(m => {
+                m.pin.bindTooltip(`<b>${m.data.name}</b><br><span style="color:${m.color}">${m.data.stage}</span>`, { direction: 'top', html: true });
+            });
+        }
+        setTimeout(() => map.invalidateSize(), 400);
+    }
+
+    document.getElementById('mode-toggle').addEventListener('change', updateMode);
+    updateMode();
+</script>
+</body>
+</html>
