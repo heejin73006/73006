@@ -2,14 +2,15 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>서울·경기권 프로젝트 현황 (상세)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>서울·경기권 프로젝트 현황 상세지도</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         :root { --border: #E0E0E0; --accent: #0055A4; }
         body { font-family: 'Noto Sans KR', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: #333; }
         
-        header { padding: 10px 20px; border-bottom: 1px solid var(--border); background: white; z-index: 1000; display: flex; justify-content: space-between; align-items: center; height: 50px; }
+        header { padding: 10px 20px; border-bottom: 1px solid var(--border); background: white; z-index: 1000; display: flex; justify-content: space-between; align-items: center; height: 50px; flex-shrink: 0; }
         h1 { margin: 0; font-size: 16px; font-weight: 700; color: var(--accent); }
 
         .switch-container { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
@@ -23,21 +24,29 @@
         .layout { display: flex; flex: 1; overflow: hidden; }
         #map { flex: 1; height: 100%; z-index: 1; }
         
-        .sidebar { width: 350px; display: flex; flex-direction: column; background: #ffffff; border-left: 1px solid var(--border); z-index: 2; }
+        .sidebar { width: 320px; display: flex; flex-direction: column; background: #ffffff; border-left: 1px solid var(--border); z-index: 2; }
         .sidebar-content { padding: 15px; overflow-y: auto; flex: 1; }
         body.full-map-mode .sidebar { display: none; }
 
+        /* 드래그 라벨 스타일 */
         .draggable-label-container {
             background: rgba(255, 255, 255, 0.98);
             border-width: 2px; border-style: solid; border-radius: 8px;
             padding: 10px; box-shadow: 4px 4px 15px rgba(0,0,0,0.15);
             text-align: left; font-size: 11px; width: 220px; cursor: grab;
         }
-        
         .label-title { font-weight: 700; font-size: 13px; display: block; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 6px; white-space: normal; line-height: 1.2; }
-        .section-tag { font-size: 9px; color: #999; font-weight: bold; margin-top: 4px; display: block; }
+        .section-tag { font-size: 9px; color: #999; font-weight: bold; margin-top: 4px; display: block; text-transform: uppercase; }
         .label-content { display: block; color: #444; margin: 2px 0; line-height: 1.4; }
 
+        /* 툴팁 스타일 (호버 팝업) */
+        .leaflet-tooltip { padding: 12px; border-radius: 8px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2); min-width: 220px; }
+        .tooltip-header { font-weight: 700; font-size: 13px; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+        .tooltip-row { display: flex; font-size: 11px; margin-bottom: 3px; line-height: 1.4; }
+        .tooltip-label { color: #888; width: 65px; flex-shrink: 0; }
+        .tooltip-value { color: #333; font-weight: 500; }
+
+        /* 테이블 스타일 */
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8f9fa; padding: 10px 5px; font-size: 12px; border-bottom: 2px solid var(--border); text-align: left; }
         td { padding: 12px 5px; border-bottom: 1px solid var(--border); font-size: 11px; vertical-align: top; }
@@ -47,7 +56,7 @@
 <body>
 
 <header>
-    <h1>🏢 서울·경기권 프로젝트 상세 현황</h1>
+    <h1>🏢 프로젝트 통합 관리 현황</h1>
     <div class="switch-container">
         Label Mode
         <label class="switch">
@@ -61,9 +70,9 @@
     <div id="map"></div>
     <div class="sidebar">
         <div class="sidebar-content">
-            <h3 style="font-size: 14px;">📋 프로젝트 리스트</h3>
+            <h3 style="font-size: 14px; margin-top: 0;">📋 프로젝트 리스트</h3>
             <table>
-                <thead><tr><th width="30">No</th><th>프로젝트 정보</th></tr></thead>
+                <thead><tr><th width="30">No</th><th>정보</th></tr></thead>
                 <tbody id="table-body"></tbody>
             </table>
         </div>
@@ -72,6 +81,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // 1. 색상 매핑
     function getStepColor(stage) {
         if (stage.includes("제조") || stage.includes("협약")) return "#E53935"; // Red
         if (stage.includes("설계")) return "#1E88E5"; // Blue
@@ -80,84 +90,116 @@
         return "#757575";
     }
 
+    // 2. 데이터셋
     const projects = [
-        { id: 1, name: "서울대 68-1관 리모델링", loc: "관악구 신림동", client: "서울대/탄소중립단", partner: "-", area: "475㎡", floor: "지상4층", vol: "33", pkg: "+공조+Grid+ICT", stage: "제조", lat: 37.4533, lng: 126.9571 },
-        { id: 2, name: "성남 정수장 리모델링", loc: "성남시 수정구", client: "수자원공사", partner: "-", area: "514㎡", floor: "지상2층", vol: "74(91)", pkg: "+공조+Grid+ICT", stage: "물품사용협약준비", lat: 37.4127, lng: 127.1087 },
-        { id: 3, name: "광명학온 공원관리동", loc: "광명시 가학동", client: "경기도시공사", partner: "솔루션비즈팀", area: "660㎡", floor: "지상2층", vol: "58", pkg: "대안검토중", stage: "발주대기중", lat: 37.4101, lng: 126.8635 },
-        { id: 4, name: "태평로빌딩 FIT 적용 리모델링", loc: "중구 세종대로", client: "이지스자산운용", partner: "삼성전자", area: "44,035㎡", floor: "지하7/지상26", vol: "3,097", pkg: "대안검토중", stage: "기본설계", lat: 37.5630, lng: 126.9757 },
-        { id: 5, name: "서울역 업무지구 통합기술 컨설팅", loc: "중구 퇴계로", client: "삼성물산/이지스", partner: "삼성물산", area: "122,542㎡", floor: "지하9/지상34", vol: "276", pkg: "대안검토중", stage: "컨설팅", lat: 37.5563, lng: 126.9744 },
-        { id: 6, name: "동서울터미널 FIT 컨설팅", loc: "광진구 광나루로", client: "신세계 프라퍼티", partner: "삼성전자", area: "383,074㎡", floor: "지하7/지상43", vol: "506", pkg: "대안검토중", stage: "컨설팅", lat: 37.5356, lng: 127.0957 },
-        { id: 7, name: "ASML 원삼면 New Office", loc: "용인시 원삼면", client: "ASML 코리아", partner: "삼우/해안 등", area: "32,000㎡", floor: "지하4/지상10", vol: "1100", pkg: "대안검토중", stage: "발주대기중", lat: 37.1543, lng: 127.3182 },
-        { id: 8, name: "크래프톤 C3 신축", loc: "성동구 성수동", client: "크래프톤", partner: "시스템 랩", area: "9,600㎡", floor: "지하4/지상11", vol: "252", pkg: "+공조+Grid+ICT", stage: "사전컨설팅", lat: 37.5408, lng: 127.0574 },
-        { id: 9, name: "애플타워", loc: "송파구 잠실동", client: "애플에이앤엠", partner: "-", area: "4,741㎡", floor: "지하6/지상17", vol: "검토중", pkg: "검토중", stage: "사전컨설팅", lat: 37.5105, lng: 127.0790 },
-        { id: 10, name: "강남 358타워 리모델링", loc: "강남구 강남대로", client: "HDC 자산운용", partner: "미래에셋/이지스", area: "37,597㎡", floor: "지하7/지상20", vol: "1523", pkg: "+공조+FTU+ICT", stage: "사전컨설팅", lat: 37.4950, lng: 127.0297 },
-        { id: 11, name: "논현동 개발 FIT 검토", loc: "강남구 논현동", client: "신세계 센트럴", partner: "해안/건원", area: "45,116㎡", floor: "지하7/지상20", vol: "1926", pkg: "+공조+FTU+ICT", stage: "사전컨설팅", lat: 37.5111, lng: 127.0225 },
-        { id: 12, name: "삼성동 168 업무시설", loc: "강남구 삼성동", client: "두나무", partner: "캡스톤/삼우", area: "34,527㎡", floor: "지하9/지상28", vol: "500", pkg: "대안검토중", stage: "사전컨설팅", lat: 37.5103, lng: 127.0629 },
-        { id: 13, name: "관수8지구 재개발", loc: "종로구 관수동", client: "NH 투자증권", partner: "한림/KCC", area: "50,823㎡", floor: "지하8/지상25", vol: "1,150", pkg: "+공조+FTU+ICT", stage: "사전컨설팅", lat: 37.5685, lng: 126.9900 },
-        { id: 14, name: "역삼 SI 타워", loc: "강남구 역삼동", client: "이지스자산운용", partner: "-", area: "66,202㎡", floor: "지하8/지상25", vol: "1960", pkg: "대안검토중", stage: "사전컨설팅", lat: 37.5015, lng: 127.0377 }
+        { id: 1, name: "서울대학교 68-1관 리모델링", loc: "관악구", client: "서울대/탄소중립단", partner: "-", area: "475㎡", floor: "지상4층", vol: "33", pkg: "+공조+Grid+ICT", stage: "제조", lat: 37.4533, lng: 126.9571 },
+        { id: 2, name: "성남 정수장 리모델링", loc: "성남시", client: "수자원공사", partner: "-", area: "514㎡", floor: "지상2층", vol: "74(91)", pkg: "+공조+Grid+ICT", stage: "물품사용협약준비", lat: 37.4127, lng: 127.1087 },
+        { id: 3, name: "광명학온 공원관리동", loc: "광명시", client: "경기도시공사", partner: "솔루션비즈팀", area: "660㎡", floor: "지상2층", vol: "58", pkg: "대안검토중", stage: "발주대기중", lat: 37.4101, lng: 126.8635 },
+        { id: 4, name: "태평로빌딩 FIT 적용 리모델링", loc: "중구", client: "이지스자산운용", partner: "삼성전자", area: "44,035㎡", floor: "지하7/지상26", vol: "3,097", pkg: "대안검토중", stage: "기본설계", lat: 37.5630, lng: 126.9757 },
+        { id: 5, name: "서울역 업무지구 통합기술", loc: "중구", client: "삼성물산/이지스", partner: "삼성물산", area: "122,542㎡", floor: "지하9/지상34", vol: "276", pkg: "대안검토중", stage: "컨설팅", lat: 37.5563, lng: 126.9744 },
+        { id: 6, name: "동서울터미널 FIT 컨설팅", loc: "광진구", client: "신세계 프라퍼티", partner: "삼성전자", area: "383,074㎡", floor: "지하7/지상43", vol: "506", pkg: "대안검토중", stage: "컨설팅", lat: 37.5356, lng: 127.0957 },
+        { id: 7, name: "ASML 원삼면 Office", loc: "용인시", client: "ASML 코리아", partner: "삼우/해안 등", area: "32,000㎡", floor: "지하4/지상10", vol: "1100", pkg: "대안검토중", stage: "발주대기중", lat: 37.1543, lng: 127.3182 },
+        { id: 8, name: "크래프톤 C3 신축", loc: "성동구", client: "크래프톤", partner: "시스템 랩", area: "9,600㎡", floor: "지하4/지상11", vol: "252", pkg: "+공조+Grid+ICT", stage: "사전컨설팅", lat: 37.5408, lng: 127.0574 },
+        { id: 9, name: "애플타워", loc: "송파구", client: "애플에이앤엠", partner: "-", area: "4,741㎡", floor: "지하6/지상17", vol: "검토중", pkg: "검토중", stage: "사전컨설팅", lat: 37.5105, lng: 127.0790 },
+        { id: 10, name: "강남 358타워 리모델링", loc: "강남구", client: "HDC 자산운용", partner: "미래에셋/이지스", area: "37,597㎡", floor: "지하7/지상20", vol: "1523", pkg: "+공조+FTU+ICT", stage: "사전컨설팅", lat: 37.4950, lng: 127.0297 },
+        { id: 11, name: "논현동 개발 FIT 검토", loc: "강남구", client: "신세계 센트럴", partner: "해안/건원", area: "45,116㎡", floor: "지하7/지상20", vol: "1926", pkg: "+공조+FTU+ICT", stage: "사전컨설팅", lat: 37.5111, lng: 127.0225 },
+        { id: 12, name: "삼성동 168 업무시설", loc: "강남구", client: "두나무", partner: "캡스톤/삼우", area: "34,527㎡", floor: "지하9/지상28", vol: "500", pkg: "대안검토중", stage: "사전컨설팅", lat: 37.5103, lng: 127.0629 },
+        { id: 13, name: "관수8지구 재개발", loc: "종로구", client: "NH 투자증권", partner: "한림/KCC", area: "50,823㎡", floor: "지하8/지상25", vol: "1,150", pkg: "+공조+FTU+ICT", stage: "사전컨설팅", lat: 37.5685, lng: 126.9900 },
+        { id: 14, name: "역삼 SI 타워", loc: "강남구", client: "이지스자산운용", partner: "-", area: "66,202㎡", floor: "지하8/지상25", vol: "1960", pkg: "대안검토중", stage: "사전컨설팅", lat: 37.5015, lng: 127.0377 }
     ];
 
-    const map = L.map('map').setView([37.51, 127.05], 11);
+    // 3. 지도 초기화
+    const map = L.map('map').setView([37.53, 127.03], 11);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     const projectLayer = L.layerGroup().addTo(map);
     const draggableGroup = L.layerGroup().addTo(map);
     const markers = [];
-    const avgLat = 37.45; const avgLng = 127.05;
+
+    // 라벨 초기 분산 배치를 위한 기준점
+    const avgLat = 37.5; const avgLng = 127.0;
 
     projects.forEach(p => {
         const color = getStepColor(p.stage);
         
-        // 사이드바
+        // [사이드바]
         document.getElementById('table-body').innerHTML += `
             <tr>
                 <td>${p.id}</td>
                 <td>
-                    <div style="font-weight:700; color:#333;">${p.name}</div>
-                    <div style="color:#777; margin:2px 0;">${p.client} | ${p.floor}</div>
+                    <div style="font-weight:700; color:#333; font-size:12px;">${p.name}</div>
+                    <div style="color:#777; margin:2px 0;">${p.client} | ${p.vol}개</div>
                     <span class="status-badge" style="background:${color}">${p.stage}</span>
                 </td>
             </tr>
         `;
 
-        // 지도 핀
+        // [지도 핀]
         const pin = L.circleMarker([p.lat, p.lng], {
-            radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 1
+            radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 0.9
         }).addTo(projectLayer);
 
-        // 드래그 라벨
+        // [호버 팝업(툴팁) 구성]
+        const tooltipHtml = `
+            <div class="tooltip-header" style="color:${color};">${p.name}</div>
+            <div class="tooltip-row">
+                <span class="tooltip-label">주요개요</span>
+                <span class="tooltip-value">${p.area} / ${p.floor}</span>
+            </div>
+            <div class="tooltip-row">
+                <span class="tooltip-label">발주/관계</span>
+                <span class="tooltip-value">${p.client}<br><small>(${p.partner})</small></span>
+            </div>
+            <div class="tooltip-row" style="margin-top:5px; padding-top:5px; border-top:1px dashed #eee;">
+                <span class="tooltip-label">예상수량</span>
+                <span class="tooltip-value" style="color:#e67e22; font-weight:700;">${p.vol} 개</span>
+            </div>
+        `;
+
+        // [호버 이벤트: 확대 및 툴팁]
+        pin.on('mouseover', function() {
+            this.setRadius(12);
+            this.setStyle({ weight: 4, fillOpacity: 1 });
+        });
+        pin.on('mouseout', function() {
+            this.setRadius(7);
+            this.setStyle({ weight: 2, fillOpacity: 0.9 });
+        });
+
+        // [드래그 라벨 모드용 구성]
         const latDiff = p.lat - avgLat;
         const lngDiff = p.lng - avgLng;
-        const initialLabelPos = [p.lat + (latDiff * 1.5), p.lng + (lngDiff * 1.8) + 0.05];
+        const initialLabelPos = [p.lat + (latDiff * 0.4), p.lng + (lngDiff * 0.4) + 0.04];
 
         const labelHtml = `
             <div class="draggable-label-container" style="border-color: ${color};">
                 <span class="label-title" style="color: ${color};">${p.id}. ${p.name}</span>
-                <span class="section-tag">[개요]</span>
-                <span class="label-content">발주처: ${p.client}</span>
-                <span class="label-content">관계사: ${p.partner}</span>
-                <span class="section-tag">[규모]</span>
-                <span class="label-content">${p.area} / ${p.floor}</span>
-                <span class="section-tag">[물량/단계]</span>
-                <span class="label-content">물량: <b>${p.vol}</b> (${p.pkg})</span>
-                <span class="label-content" style="color:${color}; font-weight:bold;">현재: ${p.stage}</span>
+                <span class="section-tag">개요 및 발주</span>
+                <span class="label-content">${p.client} (${p.partner})</span>
+                <span class="section-tag">규모</span>
+                <span class="label-content">${p.area} | ${p.floor}</span>
+                <span class="section-tag">물량/단계</span>
+                <span class="label-content"><b>${p.vol}개</b> | ${p.pkg}</span>
+                <span class="label-content" style="color:${color}; font-weight:bold; margin-top:4px;">${p.stage}</span>
             </div>
         `;
 
-        const labelIcon = L.divIcon({ html: labelHtml, className: '', iconAnchor: [0, 0] });
+        const labelIcon = L.divIcon({ html: labelHtml, className: '', iconAnchor: [-10, 10] });
         const labelMarker = L.marker(initialLabelPos, { icon: labelIcon, draggable: true });
-        const polyline = L.polyline([[p.lat, p.lng], initialLabelPos], { color: color, weight: 1, dashArray: '3, 5', opacity: 0.6 });
+        const polyline = L.polyline([[p.lat, p.lng], initialLabelPos], { color: color, weight: 1.2, dashArray: '4, 4', opacity: 0.6 });
 
         labelMarker.on('drag', (e) => polyline.setLatLngs([[p.lat, p.lng], e.target.getLatLng()]));
-        markers.push({ pin, labelMarker, polyline, data: p, color });
+        markers.push({ pin, labelMarker, polyline, data: p, color, tooltipHtml });
     });
 
+    // 4. 모드 전환 함수
     function updateMode() {
         const isLabelMode = document.getElementById('mode-toggle').checked;
         if (isLabelMode) {
             document.body.classList.add('full-map-mode');
+            draggableGroup.addTo(map);
             markers.forEach(m => {
-                m.pin.unbindTooltip();
+                m.pin.unbindTooltip(); 
                 m.labelMarker.addTo(draggableGroup);
                 m.polyline.addTo(draggableGroup);
             });
@@ -165,13 +207,16 @@
             document.body.classList.remove('full-map-mode');
             draggableGroup.clearLayers();
             markers.forEach(m => {
-                m.pin.bindTooltip(`<b>${m.data.name}</b><br>${m.data.stage}`, { direction: 'top' });
+                // 핀 모드일 때 상세 툴팁 바인딩
+                m.pin.bindTooltip(m.tooltipHtml, { direction: 'top', className: 'custom-tooltip', opacity: 1 });
             });
         }
         setTimeout(() => map.invalidateSize(), 400);
     }
 
     document.getElementById('mode-toggle').addEventListener('change', updateMode);
+    
+    // 초기 실행
     updateMode();
 </script>
 </body>
