@@ -25,17 +25,16 @@
         .sidebar-content { padding: 15px; overflow-y: auto; flex: 1; }
         body.full-map-mode .sidebar { display: none; }
 
-        /* 상세 라벨 스타일 */
+        /* 라벨 디자인 최적화 */
         .draggable-label-container {
             background: white; border-width: 2px; border-style: solid; border-radius: 8px;
             padding: 10px; box-shadow: 4px 4px 12px rgba(0,0,0,0.15);
-            text-align: left; font-size: 11px; width: 210px; cursor: grab;
+            text-align: left; font-size: 11px; width: 230px; cursor: grab;
         }
         .label-title { font-weight: 700; font-size: 12px; display: block; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 6px; }
-        .section-tag { font-size: 9px; color: #999; font-weight: bold; margin-top: 4px; display: block; }
+        .section-tag { font-size: 9px; color: #999; font-weight: bold; margin-top: 6px; display: block; }
         .label-content { display: block; color: #444; margin: 2px 0; line-height: 1.4; }
 
-        /* 툴팁 (호버 팝업) */
         .leaflet-tooltip { padding: 12px; border-radius: 8px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2); min-width: 220px; }
     </style>
 </head>
@@ -73,11 +72,11 @@
     }
 
     const projects = [
-        { id: 1, name: "서울대 68-1관 리모델링", loc: "관악구", client: "서울대/탄소중립단", partner: "-", area: "475㎡", floor: "지상4층", vol: "33", pkg: "+공조+Grid+ICT", stage: "제조", lat: 37.4533, lng: 126.9571 },
+        { id: 1, name: "서울대 68-1관 리모델링", loc: "관악구", client: "서울대", partner: "탄소중립단", area: "475㎡", floor: "지상4층", vol: "33", pkg: "+공조+Grid+ICT", stage: "제조", lat: 37.4533, lng: 126.9571 },
         { id: 2, name: "성남 정수장 리모델링", loc: "성남시", client: "수자원공사", partner: "-", area: "514㎡", floor: "지상2층", vol: "74(91)", pkg: "+공조+Grid+ICT", stage: "물품사용협약준비", lat: 37.4127, lng: 127.1087 },
         { id: 3, name: "광명학온 공원관리동", loc: "광명시", client: "경기도시공사", partner: "솔루션비즈팀", area: "660㎡", floor: "지상2층", vol: "58", pkg: "대안검토중", stage: "발주대기중", lat: 37.4101, lng: 126.8635 },
         { id: 4, name: "태평로빌딩 FIT 적용 리모델링", loc: "중구", client: "이지스자산운용", partner: "삼성전자", area: "44,035㎡", floor: "지하7/지상26", vol: "3,097", pkg: "대안검토중", stage: "기본설계", lat: 37.5630, lng: 126.9757 },
-        { id: 5, name: "서울역 업무지구 통합기술 컨설팅", loc: "중구", client: "삼성물산/이지스", partner: "삼성물산", area: "122,542㎡", floor: "지하9/지상34", vol: "276", pkg: "대안검토중", stage: "컨설팅", lat: 37.5563, lng: 126.9744 },
+        { id: 5, name: "서울역 업무지구 통합기술 컨설팅", loc: "중구", client: "이지스", partner: "삼성물산", area: "122,542㎡", floor: "지하9/지상34", vol: "276", pkg: "대안검토중", stage: "컨설팅", lat: 37.5563, lng: 126.9744 },
         { id: 6, name: "동서울터미널 FIT 컨설팅", loc: "광진구", client: "신세계 프라퍼티", partner: "삼성전자", area: "383,074㎡", floor: "지하7/지상43", vol: "506", pkg: "대안검토중", stage: "컨설팅", lat: 37.5356, lng: 127.0957 },
         { id: 7, name: "ASML 원삼면 Office", loc: "용인시", client: "ASML 코리아", partner: "삼우/해안 등", area: "32,000㎡", floor: "지하4/지상10", vol: "1100", pkg: "대안검토중", stage: "발주대기중", lat: 37.1543, lng: 127.3182 },
         { id: 8, name: "크래프톤 C3 신축", loc: "성동구", client: "크래프톤", partner: "시스템 랩", area: "9,600㎡", floor: "지하4/지상11", vol: "252", pkg: "+공조+Grid+ICT", stage: "사전컨설팅", lat: 37.5408, lng: 127.0574 },
@@ -89,7 +88,6 @@
         { id: 14, name: "역삼 SI 타워", loc: "강남구", client: "이지스자산운용", partner: "-", area: "66,202㎡", floor: "지하8/지상25", vol: "1960", pkg: "대안검토중", stage: "사전컨설팅", lat: 37.5015, lng: 127.0377 }
     ];
 
-    // 지도 초기화 (줌 컨트롤 포함)
     const map = L.map('map').setView([37.48, 127.05], 11);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
@@ -99,30 +97,23 @@
 
     projects.forEach((p, idx) => {
         const color = getStepColor(p.stage);
-        
-        // 사이드바 목록 생성
         document.getElementById('table-body').innerHTML += `
             <tr style="border-bottom:1px solid #eee;">
                 <td style="padding:10px;"><b>${p.name}</b><br><span style="color:${color}; font-size:10px;">● ${p.stage}</span></td>
             </tr>
         `;
-
-        // 지도 핀 생성
         const pin = L.circleMarker([p.lat, p.lng], { radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 0.9 }).addTo(projectLayer);
 
-        // 툴팁 구성 (라벨 모드 OFF 시)
         const tooltipHtml = `
             <div style="font-weight:700; color:${color}; font-size:13px; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:5px;">${p.name}</div>
             <div style="font-size:11px; line-height:1.5;">
+                🏢 <b>발주처(협력사):</b> ${p.client}(${p.partner})<br>
                 🏠 개요: ${p.area} / ${p.floor}<br>
-                🏢 발주: ${p.client} (${p.partner})<br>
-                📦 수량: <b style="color:#e67e22;">${p.vol} 개</b>
+                📦 수량: <b style="color:#e67e22;">${p.vol === '검토중' ? '검토중' : p.vol + '개'}</b>
             </div>
         `;
-
         pin.on('mouseover', function() { this.setRadius(12); this.setStyle({ weight: 4 }); });
         pin.on('mouseout', function() { this.setRadius(7); this.setStyle({ weight: 2 }); });
-
         markers.push({ pin, data: p, color, tooltipHtml });
     });
 
@@ -132,47 +123,35 @@
 
         if (isLabelMode) {
             document.body.classList.add('full-map-mode');
-            
             const b = map.getBounds();
             const n = b.getNorth(), s = b.getSouth(), e = b.getEast(), w = b.getWest();
 
             markers.forEach((m, i) => {
                 m.pin.unbindTooltip();
-
-                // 4면 분산 배치 로직 (겹침 방지)
                 let lLat, lLng;
-                if (i < 4) { // 왼쪽 면 (1~4번)
-                    lLat = n - ((n - s) / 5 * (i + 1));
-                    lLng = w + (e - w) * 0.12;
-                } else if (i < 8) { // 오른쪽 면 (5~8번)
-                    lLat = n - ((n - s) / 5 * (i - 3));
-                    lLng = e - (e - w) * 0.12;
-                } else if (i < 11) { // 위쪽 면 (9~11번)
-                    lLat = n - (n - s) * 0.1;
-                    lLng = w + ((e - w) / 4 * (i - 7));
-                } else { // 아래쪽 면 (12~14번)
-                    lLat = s + (n - s) * 0.1;
-                    lLng = w + ((e - w) / 4 * (i - 10));
-                }
+                if (i < 4) { lLat = n - ((n - s) / 5 * (i + 1)); lLng = w + (e - w) * 0.12; } 
+                else if (i < 8) { lLat = n - ((n - s) / 5 * (i - 3)); lLng = e - (e - w) * 0.12; } 
+                else if (i < 11) { lLat = n - (n - s) * 0.1; lLng = w + ((e - w) / 4 * (i - 7)); } 
+                else { lLat = s + (n - s) * 0.1; lLng = w + ((e - w) / 4 * (i - 10)); }
 
+                const volumeText = m.data.vol === '검토중' ? '검토중' : m.data.vol + '개';
+
+                // [수정] 섹션 내용 변경: 층수 / 연면적 / 모듈수 표시
                 const labelHtml = `
                     <div class="draggable-label-container" style="border-color: ${m.color};">
                         <span class="label-title" style="color: ${m.color};">${m.data.id}. ${m.data.name}</span>
-                        <span class="section-tag">[개요 및 규모]</span>
-                        <span class="label-content">${m.data.client} | ${m.data.floor}</span>
-                        <span class="section-tag">[물량 및 단계]</span>
-                        <span class="label-content"><b>${m.data.vol}개</b> | ${m.data.pkg}</span>
+                        <span class="section-tag">[발주처(관계사)]</span>
+                        <span class="label-content">${m.data.client}(${m.data.partner})</span>
+                        <span class="section-tag">[규모 및 물량]</span>
+                        <span class="label-content">${m.data.floor} / ${m.data.area}</span>
+                        <span class="label-content"><b>모듈수: ${volumeText}</b></span>
                         <span class="label-content" style="color:${m.color}; font-weight:bold; margin-top:5px; border-top:1px solid #f0f0f0; padding-top:4px;">현재: ${m.data.stage}</span>
                     </div>
                 `;
 
-                const labelIcon = L.divIcon({ html: labelHtml, className: '', iconAnchor: [110, 45] });
+                const labelIcon = L.divIcon({ html: labelHtml, className: '', iconAnchor: [115, 45] });
                 const labelMarker = L.marker([lLat, lLng], { icon: labelIcon, draggable: true }).addTo(draggableGroup);
-                
-                const polyline = L.polyline([[m.data.lat, m.data.lng], [lLat, lLng]], { 
-                    color: m.color, weight: 1, dashArray: '5, 5', opacity: 0.3 
-                }).addTo(draggableGroup);
-
+                const polyline = L.polyline([[m.data.lat, m.data.lng], [lLat, lLng]], { color: m.color, weight: 1, dashArray: '5, 5', opacity: 0.3 }).addTo(draggableGroup);
                 labelMarker.on('drag', (ev) => polyline.setLatLngs([[m.data.lat, m.data.lng], ev.target.getLatLng()]));
             });
         } else {
@@ -187,4 +166,3 @@
 </script>
 </body>
 </html>
-
