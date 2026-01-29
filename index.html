@@ -3,45 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>프로젝트 통합 관리</title>
+    <title>프로젝트 통합 관리 대시보드</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        :root { --border: #E0E0E0; --accent: #1565C0; /* 메인 엑센트 컬러도 블루 계열로 맞춤 */ }
-        body { font-family: 'Noto Sans KR', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: #333; }
-        header { padding: 10px 20px; border-bottom: 1px solid var(--border); background: white; z-index: 1000; display: flex; justify-content: space-between; align-items: center; height: 50px; flex-shrink: 0; }
-        h1 { margin: 0; font-size: 16px; font-weight: 700; color: var(--accent); }
-        .switch-container { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
-        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        :root { --border: #E8E8E8; --accent: #1565C0; --bg: #F5F7FA; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Noto Sans KR', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--bg); color: #333; }
+        
+        /* 헤더 디자인 개선 */
+        header { 
+            padding: 0 25px; background: white; z-index: 1000; 
+            display: flex; justify-content: space-between; align-items: center; 
+            height: 60px; flex-shrink: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        h1 { margin: 0; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+
+        .switch-container { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: #555; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 22px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 20px; }
-        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #CBD5E0; transition: .4s; border-radius: 22px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: var(--accent); }
-        input:checked + .slider:before { transform: translateX(20px); }
+        input:checked + .slider:before { transform: translateX(22px); }
 
         .layout { display: flex; flex: 1; overflow: hidden; }
         #map { flex: 1; height: 100%; z-index: 1; }
-        .sidebar { width: 300px; display: flex; flex-direction: column; background: #ffffff; border-left: 1px solid var(--border); z-index: 2; }
-        .sidebar-content { padding: 15px; overflow-y: auto; flex: 1; }
+        
+        /* 사이드바 리스트 개선 */
+        .sidebar { width: 340px; display: flex; flex-direction: column; background: #ffffff; border-left: 1px solid var(--border); z-index: 2; box-shadow: -2px 0 10px rgba(0,0,0,0.03); }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); background: #fcfcfc; }
+        .sidebar-content { padding: 10px; overflow-y: auto; flex: 1; background: #f9f9f9; }
         body.full-map-mode .sidebar { display: none; }
 
-        /* 라벨 디자인 최적화 */
-        .draggable-label-container {
-            background: white; border-width: 2px; border-style: solid; border-radius: 8px;
-            padding: 10px; box-shadow: 4px 4px 12px rgba(0,0,0,0.15);
-            text-align: left; font-size: 11px; width: 230px; cursor: grab;
+        /* 프로젝트 카드 스타일 */
+        .project-card {
+            background: white; border-radius: 10px; padding: 15px; margin-bottom: 12px;
+            border: 1px solid #edf2f7; transition: all 0.2s; cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
-        .label-title { font-weight: 700; font-size: 12px; display: block; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 6px; }
-        .section-tag { font-size: 9px; color: #999; font-weight: bold; margin-top: 6px; display: block; }
-        .label-content { display: block; color: #444; margin: 2px 0; line-height: 1.4; }
+        .project-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.08); border-color: #d1d9e6; }
+        .card-name { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: #1a202c; display: block; }
+        .card-info { font-size: 11px; color: #718096; line-height: 1.6; }
+        .card-info b { color: #4a5568; }
+        .status-badge { 
+            display: inline-block; padding: 3px 8px; border-radius: 4px; 
+            font-size: 10px; font-weight: 700; color: white; margin-bottom: 8px; 
+        }
 
-        .leaflet-tooltip { padding: 12px; border-radius: 8px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.2); min-width: 220px; }
+        /* 라벨 모드 디자인 */
+        .draggable-label-container {
+            background: white; border-width: 2px; border-style: solid; border-radius: 12px;
+            padding: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: left; font-size: 11px; width: 240px; cursor: grab;
+        }
+        .label-title { font-weight: 700; font-size: 12px; display: block; border-bottom: 1px solid #f0f0f0; padding-bottom: 6px; margin-bottom: 8px; }
+        .section-tag { font-size: 9px; color: #A0AEC0; font-weight: bold; margin-top: 8px; display: block; text-transform: uppercase; }
+        .label-content { display: block; color: #4A5568; margin: 2px 0; line-height: 1.5; }
+
+        /* 지도 위 범례 */
+        .legend {
+            position: absolute; bottom: 30px; right: 30px; background: white; padding: 12px;
+            border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; font-size: 11px;
+        }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+        .legend-color { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
     </style>
 </head>
 <body>
 
 <header>
-    <h1>🏢 프로젝트 통합 관리</h1>
+    <h1>🏢 프로젝트 통합 관리 <small style="font-weight: 300; font-size: 12px; color: #999; margin-left: 10px;">Smart Dashboard</small></h1>
     <div class="switch-container">
         Label Mode
         <label class="switch">
@@ -54,26 +86,30 @@
 <div class="layout">
     <div id="map"></div>
     <div class="sidebar">
-        <div class="sidebar-content">
-            <h3 style="font-size: 14px; margin-top:0;">📋 리스트</h3>
-            <table id="table-body" style="width:100%; border-collapse: collapse; font-size:11px;"></table>
+        <div class="sidebar-header">
+            <h3 style="font-size: 15px; margin:0;">📋 프로젝트 리스트</h3>
+            <p style="font-size: 11px; color: #999; margin: 5px 0 0 0;">총 14개의 프로젝트가 등록되어 있습니다.</p>
         </div>
+        <div class="sidebar-content" id="sidebar-list">
+            </div>
     </div>
+</div>
+
+<div class="legend">
+    <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px;">단계별 안내</div>
+    <div class="legend-item"><div class="legend-color" style="background:#D84315;"></div> 제조/협약 (진행)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#FB8C00;"></div> 발주 준비 (대기)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#1565C0;"></div> 설계 단계 (기획)</div>
+    <div class="legend-item"><div class="legend-color" style="background:#42A5F5;"></div> 컨설팅/검토 (사전)</div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // [수정 2] 컬러 팔레트 변경: 오렌지 계열과 블루 계열로 단순화
     function getStepColor(stage) {
-        // 오렌지 계열 (실행, 계약 단계)
-        if (stage.includes("제조") || stage.includes("협약")) return "#D84315"; // 진한 오렌지
-        if (stage.includes("발주")) return "#FB8C00"; // 밝은 오렌지
-        
-        // 블루 계열 (계획, 검토 단계)
-        if (stage.includes("설계")) return "#1565C0"; // 진한 블루
-        if (stage.includes("컨설팅")) return "#42A5F5"; // 밝은 블루
-        
-        // 기본 (회색)
+        if (stage.includes("제조") || stage.includes("협약")) return "#D84315";
+        if (stage.includes("발주")) return "#FB8C00";
+        if (stage.includes("설계")) return "#1565C0";
+        if (stage.includes("컨설팅")) return "#42A5F5";
         return "#9E9E9E";
     }
 
@@ -101,26 +137,41 @@
     const draggableGroup = L.layerGroup().addTo(map);
     const markers = [];
 
+    // [사이드바 리스트 & 핀 생성]
     projects.forEach((p, idx) => {
         const color = getStepColor(p.stage);
-        document.getElementById('table-body').innerHTML += `
-            <tr style="border-bottom:1px solid #eee;">
-                <td style="padding:10px;"><b>${p.name}</b><br><span style="color:${color}; font-size:10px;">● ${p.stage}</span></td>
-            </tr>
+        
+        // 사이드바 프로젝트 카드 HTML 생성
+        const card = document.createElement('div');
+        card.className = 'project-card';
+        card.innerHTML = `
+            <span class="status-badge" style="background:${color}">${p.stage}</span>
+            <span class="card-name">${p.name}</span>
+            <div class="card-info">
+                🏢 <b>발주:</b> ${p.client}(${p.partner})<br>
+                📐 <b>규모:</b> ${p.floor} / ${p.area}<br>
+                📦 <b>물량:</b> ${p.vol === '검토중' ? '검토중' : p.vol + '개'}
+            </div>
         `;
-        const pin = L.circleMarker([p.lat, p.lng], { radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 0.9 }).addTo(projectLayer);
+        // 클릭 시 지도로 이동하는 이벤트
+        card.onclick = () => {
+            map.flyTo([p.lat, p.lng], 14, { duration: 1.5 });
+            pin.openTooltip();
+        };
+        document.getElementById('sidebar-list').appendChild(card);
 
-        // [수정 1] 툴팁 내 수량 색상 변경 (노랑 -> 검정 #333)
+        // 지도 핀 생성
+        const pin = L.circleMarker([p.lat, p.lng], { radius: 7, fillColor: color, color: "#fff", weight: 2, fillOpacity: 0.9 }).addTo(projectLayer);
         const tooltipHtml = `
             <div style="font-weight:700; color:${color}; font-size:13px; border-bottom:1px solid #eee; padding-bottom:5px; margin-bottom:5px;">${p.name}</div>
             <div style="font-size:11px; line-height:1.5;">
-                🏢 <b>발주처(협력사):</b> ${p.client}(${p.partner})<br>
-                🏠 개요: ${p.area} / ${p.floor}<br>
-                📦 수량: <b style="color:#333;">${p.vol === '검토중' ? '검토중' : p.vol + '개'}</b>
+                🏢 <b>발주처:</b> ${p.client}<br>
+                🏠 <b>규모:</b> ${p.area} / ${p.floor}<br>
+                📦 <b>수량:</b> <b style="color:#333;">${p.vol === '검토중' ? '검토중' : p.vol + '개'}</b>
             </div>
         `;
-        pin.on('mouseover', function() { this.setRadius(12); this.setStyle({ weight: 4 }); });
-        pin.on('mouseout', function() { this.setRadius(7); this.setStyle({ weight: 2 }); });
+        pin.on('mouseover', function() { this.setRadius(12); });
+        pin.on('mouseout', function() { this.setRadius(7); });
         markers.push({ pin, data: p, color, tooltipHtml });
     });
 
@@ -136,6 +187,7 @@
             markers.forEach((m, i) => {
                 m.pin.unbindTooltip();
                 let lLat, lLng;
+                // 라벨 배치 로직 (화면 구석에 정렬)
                 if (i < 4) { lLat = n - ((n - s) / 5 * (i + 1)); lLng = w + (e - w) * 0.12; } 
                 else if (i < 8) { lLat = n - ((n - s) / 5 * (i - 3)); lLng = e - (e - w) * 0.12; } 
                 else if (i < 11) { lLat = n - (n - s) * 0.1; lLng = w + ((e - w) / 4 * (i - 7)); } 
@@ -151,13 +203,13 @@
                         <span class="section-tag">[규모 및 물량]</span>
                         <span class="label-content">${m.data.floor} / ${m.data.area}</span>
                         <span class="label-content"><b>모듈수: ${volumeText}</b></span>
-                        <span class="label-content" style="color:${m.color}; font-weight:bold; margin-top:5px; border-top:1px solid #f0f0f0; padding-top:4px;">현재: ${m.data.stage}</span>
+                        <span class="label-content" style="color:${m.color}; font-weight:bold; margin-top:5px; border-top:1px solid #f0f0f0; padding-top:4px;">상태: ${m.data.stage}</span>
                     </div>
                 `;
 
-                const labelIcon = L.divIcon({ html: labelHtml, className: '', iconAnchor: [115, 45] });
+                const labelIcon = L.divIcon({ html: labelHtml, className: '', iconAnchor: [120, 50] });
                 const labelMarker = L.marker([lLat, lLng], { icon: labelIcon, draggable: true }).addTo(draggableGroup);
-                const polyline = L.polyline([[m.data.lat, m.data.lng], [lLat, lLng]], { color: m.color, weight: 1, dashArray: '5, 5', opacity: 0.3 }).addTo(draggableGroup);
+                const polyline = L.polyline([[m.data.lat, m.data.lng], [lLat, lLng]], { color: m.color, weight: 1.5, dashArray: '6, 6', opacity: 0.4 }).addTo(draggableGroup);
                 labelMarker.on('drag', (ev) => polyline.setLatLngs([[m.data.lat, m.data.lng], ev.target.getLatLng()]));
             });
         } else {
